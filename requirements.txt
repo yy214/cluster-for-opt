@@ -1,0 +1,9 @@
+ipykernel
+torch
+torchaudio
+torchvision
+numpy
+scipy
+scikit-learn
+matplotlib
+tqdm

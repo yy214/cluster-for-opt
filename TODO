@@ -1,0 +1,21 @@
+implement
+- SVRG (or find implem for minibatch) -> understand code
+    where is the \nabla_i f(snap)
+- clusterSVRG, COVER (warning: need minibatch implem, get inspiration from SVRG)
+- cluster block CD -> implement clustered sampling
+    how to actually sample evenly with clusters if the number of clusters doesn't divide the batch size?
+    solution: successive sampling
+
+https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html#full-implementation 
+- CRAIG?
+- gradient cluster from Faghri?
+
+need to compare sampling each time / successive sampling
+
+
+
+performance:
+- GPU acceleration -> check if possible
+- accuracy over time
+- nb of iterations + time of reaching a certain accuracy
+- time of each iteration
