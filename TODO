@@ -1,10 +1,12 @@
+git push
+running loss -> smoothen
+
 implement
 - SVRG (or find implem for minibatch) -> understand code
-    where is the \nabla_i f(snap)
+    FIX: why not converging correctly (may try minibatch 1)
+
 - clusterSVRG, COVER (warning: need minibatch implem, get inspiration from SVRG)
-- cluster block CD -> implement clustered sampling
-    how to actually sample evenly with clusters if the number of clusters doesn't divide the batch size?
-    solution: successive sampling
+- clustered sampling: MAKE IT WORK OR PROVE THAT IT DOESN'T
 
 https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html#full-implementation 
 - CRAIG?
