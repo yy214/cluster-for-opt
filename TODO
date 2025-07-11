@@ -1,19 +1,15 @@
-git push
-running loss -> smoothen
-
 implement
-- SVRG (or find implem for minibatch) -> understand code
-    FIX: why not converging correctly (may try minibatch 1)
-
-- clusterSVRG, COVER (warning: need minibatch implem, get inspiration from SVRG)
+- code cleanup
+- FIND OPTIMUM THEN DISPLAY THING-OPT
+- test COVER
+- clusterSVRG
 - clustered sampling: MAKE IT WORK OR PROVE THAT IT DOESN'T
+
+- adjust by time elapsed (time.perf_counter())
 
 https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html#full-implementation 
 - CRAIG?
 - gradient cluster from Faghri?
-
-need to compare sampling each time / successive sampling
-
 
 
 performance:
