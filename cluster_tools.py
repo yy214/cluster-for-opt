@@ -38,12 +38,14 @@ def kmeans_plus_plus_cosine(X, k):
     
     return np.array(centroids)
 
-# KMeans with Cosine Distance - Full Algorithm
+# KMeans with Cosine Distance - Full Algorithm (slightly modified from GPT)
 def kmeans_cosine(X, k, max_iters=100, tol=1e-4):
     # Initialize centroids using KMeans++ with cosine distance
     centroids = kmeans_plus_plus_cosine(X, k)
-    
+    inertia = 0
     for _ in range(max_iters):
+        inertia = 0
+        
         # Step 1: Assign each point to the nearest centroid based on cosine distance
         labels = []
         for point in X:
@@ -69,29 +71,50 @@ def kmeans_cosine(X, k, max_iters=100, tol=1e-4):
         if np.all(np.abs(new_centroids - centroids) < tol):
             break
         
+        for i, point in enumerate(X):
+            inertia += cosine_distance(point, new_centroids[labels[i]])
+
         # Update centroids for the next iteration
         centroids = new_centroids
     
-    return centroids, labels
+    return centroids, labels, inertia
 
-def kmeans_elbow(dataset, cap=25):
+def kmeans_elbow(dataset, distance="euclidian", cap=25):
     lim = min(int(np.sqrt(len(dataset))), cap)
     K = range(1, lim)
     inertias = []
-
-    for k in K:
-        kmeans = KMeans(n_clusters=k).fit(dataset)
-        inertias.append(kmeans.inertia_)
-
+    if distance == "euclidian":
+        for k in K:
+            kmeans = KMeans(n_clusters=k).fit(dataset)
+            inertias.append(kmeans.inertia_)
+    elif distance == "cosine":
+        for k in K:
+            _, _, inertia = kmeans_cosine(dataset, k)
+            inertias.append(inertia)
+    else:
+        raise NotImplementedError("Only 'euclidian' or 'cosine'")
     kl = KneeLocator(K, inertias, curve="convex", direction="decreasing")
     return kl.elbow
 
+def kmeans_pp_elbow(dataset):
+    ideal_k = kmeans_elbow(dataset)
+    kmeans = KMeans(n_clusters=ideal_k).fit(dataset)
+    return kmeans.labels_
+
+def kmeans_cosine_elbow(dataset):
+    ideal_k = kmeans_elbow(dataset, distance="cosine")
+    _, labels, _ = kmeans_cosine(dataset, ideal_k)
+    return labels
+
 class ClusterSampler(Sampler):
-    def __init__(self, data_source:Sized, batch_size):
-        self.cluster_count = kmeans_elbow(data_source)
-        kmeans_res = KMeans(n_clusters=self.cluster_count).fit(data_source)
+    def __init__(self, 
+                 data_source:Sized, 
+                 batch_size, 
+                 clustering_method=kmeans_pp_elbow):
+        labels = clustering_method(data_source)
+        self.cluster_count = max(labels)+1
         self.clusters = [[] for _ in range(self.cluster_count)]
-        for i, l in enumerate(kmeans_res.labels_):
+        for i, l in enumerate(labels):
             self.clusters[l].append(i)
 
         self.num_samples = len(data_source)

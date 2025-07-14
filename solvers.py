@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader, Sampler
 import numpy as np
 
 from sklearn.cluster import KMeans
-from cluster_tools import kmeans_elbow
+from cluster_tools import kmeans_pp_elbow
 
 from utils import clone_model
 
@@ -21,6 +21,9 @@ def calc_grad(model:nn.Module, data, target, loss_function):
     loss = loss_function(outputs, target)
     loss.backward() #compute grad
     return loss
+
+
+
 
 def solve_problem(model,
                   criterion,
@@ -56,6 +59,66 @@ def solve_problem(model,
             break
     
     return np.array(timestamps), np.array(loss_hist), model
+
+
+
+def weighted_solver(model,
+                    criterion,
+                    optimizer_class,
+                    datasource,
+                    n_iter: int=100000,
+                    cluster_method=kmeans_pp_elbow, 
+                    time_lim=None, # in seconds
+                    verbose=False):
+    assert n_iter or time_lim, "No limit to the number of iterations"
+
+    if verbose:
+        print("Building models...")
+    optimizer = optimizer_class(model.parameters())
+
+    n = len(datasource)
+
+    labels = cluster_method(datasource)
+    cluster_count = max(labels)+1
+    clusters = [[] for _ in range(cluster_count)]
+    cluster_sizes = np.zeros(cluster_count)
+    for i, l in enumerate(labels):
+        clusters[l].append(i)
+        cluster_sizes[l] += 1
+    cluster_weights = torch.from_numpy(cluster_sizes) / n
+
+    dataset = torch.from_numpy(datasource)
+    
+    loss_hist = []
+    timestamps = []
+    begin_t = time.perf_counter()
+    if n_iter is None:
+        n_iter = 100000
+    for i in tqdm(range(n_iter)):
+        # choosing by batch
+        batch_ids = [0]*cluster_count
+        for i, c in enumerate(clusters):
+            batch_ids[i] = np.random.choice(c)
+        
+        batch = dataset[batch_ids]
+        outputs = model(batch)
+        weighted = cluster_weights*outputs
+        loss = criterion(weighted, None)
+        optimizer.zero_grad()
+        loss.backward() #compute grad
+        optimizer.step()
+
+        l = len(batch)*loss.item()
+        
+        loss_hist.append(l)
+        elapsed_t = time.perf_counter()-begin_t
+        timestamps.append(elapsed_t)
+        if time_lim and elapsed_t > time_lim:
+            break
+    
+    return np.array(timestamps), np.array(loss_hist), model
+
+
 
 def svrg(model:nn.Module,
          loss_function,
@@ -118,6 +181,7 @@ def COVER(model:nn.Module,
          sampler:Sampler,
          *model_args,
          n_epoch,
+         cluster_method=kmeans_pp_elbow,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function
          ):
@@ -131,10 +195,10 @@ def COVER(model:nn.Module,
     dataset = torch.from_numpy(data)
     n = len(dataset)
 
-    cluster_count = kmeans_elbow(dataset)
-    kmeans_res = KMeans(n_clusters=cluster_count).fit(dataset)
+    labels = kmeans_pp_elbow(dataset)
+    cluster_count = max(labels)+1
     cluster_probs = np.zeros(cluster_count)
-    for l in kmeans_res.labels_:
+    for l in labels:
         cluster_probs[l] += 1
     cluster_probs /= np.sum(cluster_probs)
 
@@ -159,7 +223,7 @@ def COVER(model:nn.Module,
             running_loss += loss.item() / n
             # print(running_loss, *model.parameters())
             curr_cluster = 0
-            curr_cluster = kmeans_res.labels_[data_id]
+            curr_cluster = labels[data_id]
             
             for param, g_c, g_b in zip(model.parameters(),
                                        g_cluster[curr_cluster],
@@ -183,6 +247,7 @@ def clusterSVRG(model:nn.Module,
          sampler:Sampler,
          *model_args,
          n_epoch,
+         cluster_method=kmeans_pp_elbow,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function
          ):
@@ -196,10 +261,10 @@ def clusterSVRG(model:nn.Module,
     dataset = torch.from_numpy(data)
     n = len(dataset)
 
-    cluster_count = kmeans_elbow(dataset)
-    kmeans_res = KMeans(n_clusters=cluster_count).fit(dataset)
+    labels = kmeans_pp_elbow(dataset)
+    cluster_count = max(labels)+1
     cluster_probs = np.zeros(cluster_count)
-    for l in kmeans_res.labels_:
+    for l in labels:
         cluster_probs[l] += 1
     cluster_probs /= np.sum(cluster_probs)
 
@@ -227,7 +292,7 @@ def clusterSVRG(model:nn.Module,
             model.zero_grad()
             curr_loss = calc_grad(model, batch, "", loss_function)
             
-            curr_cluster = kmeans_res.labels_[data_id]
+            curr_cluster = labels[data_id]
             for param, g_c, g_c_total, p_prev, g_total, in \
                     zip(model.parameters(),
                         z_cluster[curr_cluster],

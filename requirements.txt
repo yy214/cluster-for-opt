@@ -2,9 +2,10 @@ ipykernel
 torch
 torchaudio
 torchvision
-numpy
+numpy==1.26.3
 scipy
 scikit-learn
+scikit-learn-extra
 matplotlib
 tqdm
 kneed
