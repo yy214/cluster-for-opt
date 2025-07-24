@@ -1,20 +1,13 @@
-new dataset
+check variance
 
-implement
-- FIND OPTIMUM THEN DISPLAY THING-OPT
-- test COVER
-- clusterSVRG
-- clustered sampling: MAKE IT WORK OR PROVE THAT IT DOESN'T
 
-- adjust by time elapsed (time.perf_counter())
+changing step size
+
+fix minibatch svrg -> snapshot epoch change
+fix cluster svrg
+fix cover
 
 https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html#full-implementation 
 - CRAIG?
 - gradient cluster from Faghri?
 
-
-performance:
-- GPU acceleration -> check if possible
-- accuracy over time
-- nb of iterations + time of reaching a certain accuracy
-- time of each iteration

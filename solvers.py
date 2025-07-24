@@ -1,7 +1,9 @@
 from tqdm import tqdm
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Sampler
+from torch.utils.data import DataLoader, Sampler, TensorDataset
+from torch.optim.lr_scheduler import LambdaLR
+
 import numpy as np
 
 from sklearn.cluster import KMeans
@@ -23,20 +25,23 @@ def calc_grad(model:nn.Module, data, target, loss_function):
     return loss
 
 
-
-
 def solve_problem(model,
                   criterion,
                   optimizer_class,
                   dataloader:DataLoader,
                   n_epoch: int=100, 
                   time_lim=None, # in seconds
-                  verbose=False):
+                  verbose=False, 
+                  lr=0.001,
+                  lr_lambda=None):
     assert n_epoch or time_lim, "No limit to the number of iterations"
 
     if verbose:
         print("Building models...")
-    optimizer = optimizer_class(model.parameters())
+    optimizer = optimizer_class(model.parameters(), lr=lr)
+
+    if lr_lambda is not None:
+        scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
 
     n = len(dataloader.dataset)
     loss_hist = []
@@ -45,15 +50,20 @@ def solve_problem(model,
     if n_epoch is None:
         n_epoch = 100000
     for i in tqdm(range(n_epoch)):
-        epoch_loss = 0
-        for batch in dataloader:
+        # epoch_loss = 0
+        for (batch, labels) in dataloader:
             optimizer.zero_grad()
-            loss = calc_grad(model, batch, None, criterion)
+            loss = calc_grad(model, batch, labels, criterion)
             optimizer.step()
-            epoch_loss += len(batch)/n*loss.item()
+            # epoch_loss += len(batch)/n*loss.item()
         
-        loss_hist.append(epoch_loss)
-        elapsed_t = time.perf_counter()-begin_t
+        if lr_lambda is not None:
+            scheduler.step()
+
+        outputs = model(dataloader.dataset.tensors[0])
+        epoch_loss = criterion(outputs, dataloader.dataset.tensors[1])
+        loss_hist.append(epoch_loss.item())
+        elapsed_t = time.perf_counter() - begin_t
         timestamps.append(elapsed_t)
         if time_lim and elapsed_t > time_lim:
             break
@@ -64,21 +74,26 @@ def solve_problem(model,
 
 def weighted_solver(model,
                     criterion,
-                    optimizer_class,
-                    datasource,
+                    optimizer,
+                    datasource:TensorDataset,
                     n_iter: int=100000,
                     cluster_method=kmeans_pp_elbow, 
                     time_lim=None, # in seconds
-                    verbose=False):
+                    verbose=False,
+                    lr_lambda=None):
     assert n_iter or time_lim, "No limit to the number of iterations"
 
-    if verbose:
-        print("Building models...")
-    optimizer = optimizer_class(model.parameters())
+    # if verbose:
+        # print("Building models...")
+    # optimizer = optimizer_class(model.parameters())
+
+    if lr_lambda is not None:
+        scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
 
     n = len(datasource)
+    dataset, labels = datasource.tensors
 
-    labels = cluster_method(datasource)
+    labels = cluster_method(dataset)
     cluster_count = max(labels)+1
     clusters = [[] for _ in range(cluster_count)]
     cluster_sizes = np.zeros(cluster_count)
@@ -86,8 +101,6 @@ def weighted_solver(model,
         clusters[l].append(i)
         cluster_sizes[l] += 1
     cluster_weights = torch.from_numpy(cluster_sizes) / n
-
-    dataset = torch.from_numpy(datasource)
     
     loss_hist = []
     timestamps = []
@@ -101,15 +114,19 @@ def weighted_solver(model,
             batch_ids[i] = np.random.choice(c)
         
         batch = dataset[batch_ids]
+        label_batch = labels[batch_ids]
         outputs = model(batch)
         weighted = cluster_weights*outputs
-        loss = criterion(weighted, None)
+        loss = criterion(weighted, label_batch)
         optimizer.zero_grad()
         loss.backward() #compute grad
         optimizer.step()
 
         l = len(batch)*loss.item()
         
+        if lr_lambda is not None:
+            scheduler.step()
+
         loss_hist.append(l)
         elapsed_t = time.perf_counter()-begin_t
         timestamps.append(elapsed_t)
@@ -119,7 +136,7 @@ def weighted_solver(model,
     return np.array(timestamps), np.array(loss_hist), model
 
 
-
+# slightly modified from https://github.com/kilianFatras/variance_reduced_neural_networks
 def svrg(model:nn.Module,
          loss_function,
          dataloader:DataLoader,
@@ -127,7 +144,8 @@ def svrg(model:nn.Module,
          n_epoch,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function 
-         print_freq=None):
+         print_freq=None,
+         lr_lambda=None):
     """
     Function to updated weights with a SVRG backpropagation \\
     args : dataset, loss function, number of epochs, learning rate \\
@@ -137,36 +155,41 @@ def svrg(model:nn.Module,
 
     total_loss_epoch = []
     timestamps = []
-    dataset = torch.from_numpy(dataloader.dataset)
+    dataset, labels = dataloader.dataset.tensors
+
+    lr = learning_rate
 
     begin_t = time.perf_counter()
     if n_epoch is None:
         n_epoch = 100000
     for epoch in tqdm(range(n_epoch)):
+        if lr_lambda is not None:
+            lr = learning_rate*lr_lambda(epoch)
+
         previous_net = clone_model(model, *model_args) # for calculating gradient each step
         
         #Compute full grad
         previous_net.zero_grad()
         total_loss_epoch.append(
-            calc_grad(previous_net, dataset, None, loss_function).item())
+            calc_grad(previous_net, dataset, labels, loss_function).item())
         
         previous_net_grads = [p.grad.data for p in previous_net.parameters()]
         # print(total_loss_epoch[epoch])
 
         #Run over the dataset
-        for batch in dataloader:
+        for (batch, label_batch) in dataloader:
 
             #Compute prev stoc grad
             previous_net.zero_grad() #grad = 0
-            prev_loss = calc_grad(previous_net, batch, None, loss_function)
+            prev_loss = calc_grad(previous_net, batch, label_batch, loss_function)
             
             #Compute cur stoc grad
             model.zero_grad() #grad = 0
-            cur_loss = calc_grad(model, batch, None, loss_function)
+            cur_loss = calc_grad(model, batch, label_batch, loss_function)
             
             #Backward
             for param1, param2, param3 in zip(model.parameters(), previous_net.parameters(), previous_net_grads): 
-                param1.data.sub_((learning_rate) * (param1.grad.data - param2.grad.data + param3))
+                param1.data.sub_(lr * (param1.grad.data - param2.grad.data + param3))
         
         elapsed_t = time.perf_counter()-begin_t
         timestamps.append(elapsed_t)
@@ -175,15 +198,19 @@ def svrg(model:nn.Module,
 
     return np.array(timestamps), np.array(total_loss_epoch), model
 
+
+
+# TODO: fix convergence
 def COVER(model:nn.Module,
          loss_function,
-         data,
+         data:TensorDataset,
          sampler:Sampler,
          *model_args,
          n_epoch,
          cluster_method=kmeans_pp_elbow,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function
+         lr_lambda=None
          ):
     """
     See COVER: a cluster-based variance reduced method for online learning (Yuan et al. 2019)
@@ -192,7 +219,7 @@ def COVER(model:nn.Module,
 
     total_loss_epoch = []
     timestamps = []
-    dataset = torch.from_numpy(data)
+    dataset, targets = data.tensors
     n = len(dataset)
 
     labels = kmeans_pp_elbow(dataset)
@@ -210,18 +237,24 @@ def COVER(model:nn.Module,
                   for _ in range(cluster_count)]
     g_bar = [torch.zeros_like(p) for p in model.parameters()]
 
+    lr = learning_rate
+
     begin_t = time.perf_counter()
     if n_epoch is None:
         n_epoch = 100000
     for epoch in tqdm(range(n_epoch)):
+        if lr_lambda is not None:
+            lr = learning_rate*lr_lambda(epoch)
+
         running_loss = 0
-        # shuffled_ids = torch.randperm(n)
+        
         for data_id in sampler:
             batch = dataset[data_id]
+            target_batch = labels[data_id]
             model.zero_grad()
-            loss = calc_grad(model, batch, "", loss_function)
+            loss = calc_grad(model, batch, target_batch, loss_function)
             running_loss += loss.item() / n
-            # print(running_loss, *model.parameters())
+            
             curr_cluster = 0
             curr_cluster = labels[data_id]
             
@@ -241,15 +274,17 @@ def COVER(model:nn.Module,
 
     return np.array(timestamps), np.array(total_loss_epoch), model
 
+#TODO: fix
 def clusterSVRG(model:nn.Module,
          loss_function,
-         data,
+         data:TensorDataset,
          sampler:Sampler,
          *model_args,
          n_epoch,
          cluster_method=kmeans_pp_elbow,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function
+         lr_lambda=None
          ):
     """
     See https://arxiv.org/abs/1602.02151
@@ -258,7 +293,7 @@ def clusterSVRG(model:nn.Module,
 
     total_loss_epoch = []
     timestamps = []
-    dataset = torch.from_numpy(data)
+    dataset, targets = data.tensors
     n = len(dataset)
 
     labels = kmeans_pp_elbow(dataset)
@@ -268,16 +303,20 @@ def clusterSVRG(model:nn.Module,
         cluster_probs[l] += 1
     cluster_probs /= np.sum(cluster_probs)
 
+    lr = learning_rate
 
     begin_t = time.perf_counter()
     if n_epoch is None:
         n_epoch = 100000
     for epoch in tqdm(range(n_epoch)):
+        if lr_lambda is not None:
+            lr = learning_rate*lr_lambda(epoch)
+
         #Compute full grad
         previous_net = clone_model(model, *model_args) # for calculating gradient each step
         previous_net.zero_grad()
         total_loss_epoch.append(
-            calc_grad(previous_net, dataset, None, loss_function).item())
+            calc_grad(previous_net, dataset, labels, loss_function).item())
         previous_net_grads = [p.grad.data for p in previous_net.parameters()]
 
         z_cluster = [[torch.zeros_like(p) for p in model.parameters()]
@@ -285,12 +324,13 @@ def clusterSVRG(model:nn.Module,
         z_total = [torch.zeros_like(p) for p in model.parameters()]
         for data_id in sampler:
             batch = dataset[data_id]
+            target_batch = targets[data_id]
 
             previous_net.zero_grad()
-            prev_loss = calc_grad(previous_net, batch, "", loss_function)
+            prev_loss = calc_grad(previous_net, batch, target_batch, loss_function)
 
             model.zero_grad()
-            curr_loss = calc_grad(model, batch, "", loss_function)
+            curr_loss = calc_grad(model, batch, target_batch, loss_function)
             
             curr_cluster = labels[data_id]
             for param, g_c, g_c_total, p_prev, g_total, in \

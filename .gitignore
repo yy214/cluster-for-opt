@@ -1,3 +1,9 @@
+# datasets
+data/
+
+# saved weights, losses, etc
+saves/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
