@@ -33,12 +33,13 @@ def solve_problem(model,
                   time_lim=None, # in seconds
                   verbose=False, 
                   lr=0.001,
-                  lr_lambda=None):
+                  lr_lambda=None,
+                  l2=0):
     assert n_epoch or time_lim, "No limit to the number of iterations"
 
     if verbose:
         print("Building models...")
-    optimizer = optimizer_class(model.parameters(), lr=lr)
+    optimizer = optimizer_class(model.parameters(), lr=lr, weight_decay=l2)
 
     if lr_lambda is not None:
         scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
@@ -80,7 +81,8 @@ def weighted_solver(model,
                     cluster_method=kmeans_pp_elbow, 
                     time_lim=None, # in seconds
                     verbose=False,
-                    lr_lambda=None):
+                    lr_lambda=None,
+                    ):
     assert n_iter or time_lim, "No limit to the number of iterations"
 
     # if verbose:
@@ -145,7 +147,8 @@ def svrg(model:nn.Module,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function 
          print_freq=None,
-         lr_lambda=None):
+         lr_lambda=None,
+         l2=0):
     """
     Function to updated weights with a SVRG backpropagation \\
     args : dataset, loss function, number of epochs, learning rate \\
@@ -189,7 +192,7 @@ def svrg(model:nn.Module,
             
             #Backward
             for param1, param2, param3 in zip(model.parameters(), previous_net.parameters(), previous_net_grads): 
-                param1.data.sub_(lr * (param1.grad.data - param2.grad.data + param3))
+                param1.data.sub_(lr * (param1.grad.data - param2.grad.data + param3 + l2*param1.data))
         
         elapsed_t = time.perf_counter()-begin_t
         timestamps.append(elapsed_t)
@@ -207,10 +210,12 @@ def COVER(model:nn.Module,
          sampler:Sampler,
          *model_args,
          n_epoch,
+         label_processing=None,
          cluster_method=kmeans_pp_elbow,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function
-         lr_lambda=None
+         lr_lambda=None,
+         l2=0,
          ):
     """
     See COVER: a cluster-based variance reduced method for online learning (Yuan et al. 2019)
@@ -222,7 +227,12 @@ def COVER(model:nn.Module,
     dataset, targets = data.tensors
     n = len(dataset)
 
-    labels = kmeans_pp_elbow(dataset)
+    if label_processing is None:
+        data_source = dataset.tensors[0]
+    else:
+        data_source = label_processing(dataset)
+
+    labels = kmeans_pp_elbow(data_source)
     cluster_count = max(labels)+1
     cluster_probs = np.zeros(cluster_count)
     for l in labels:
@@ -262,7 +272,7 @@ def COVER(model:nn.Module,
                                        g_cluster[curr_cluster],
                                        g_bar):
                 grad = param.grad.data
-                param.data.sub_(learning_rate*(grad - g_c + g_b))
+                param.data.sub_(learning_rate*(grad - g_c + g_b + l2*param.data))
                 g_c.add_(cluster_relax[curr_cluster]*(g_c - grad))
                 g_b.add_(relax*(g_c - grad))
         
@@ -281,6 +291,7 @@ def clusterSVRG(model:nn.Module,
          sampler:Sampler,
          *model_args,
          n_epoch,
+         label_processing=None,
          cluster_method=kmeans_pp_elbow,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function
@@ -296,7 +307,12 @@ def clusterSVRG(model:nn.Module,
     dataset, targets = data.tensors
     n = len(dataset)
 
-    labels = kmeans_pp_elbow(dataset)
+    if label_processing is None:
+        data_source = dataset.tensors[0]
+    else:
+        data_source = label_processing(dataset)
+
+    labels = kmeans_pp_elbow(data_source)
     cluster_count = max(labels)+1
     cluster_probs = np.zeros(cluster_count)
     for l in labels:

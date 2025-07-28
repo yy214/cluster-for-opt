@@ -34,23 +34,23 @@ def kmeans_pp_elbow(dataset, distance="euclidian"):
 
 kmeans_cos_elbow = lambda data: kmeans_pp_elbow(data, "cosine")
 
-def process_2_labels(dataset:TensorDataset):
+def logistic_label_process(dataset:TensorDataset):
     data, labels = dataset.tensors
-    res = data * (2*labels - 1).unsqueeze(1).float()
+    res = data * (1 - 2*labels).unsqueeze(1).float()
     return res
 
 # TODO: optimize this (possible)
 class ClusterSampler(Sampler):
     def __init__(self, 
-                 data_source: Sized, 
+                 dataset: TensorDataset, 
                  batch_size, 
-                #  label_processing=None,
+                 label_processing=None,
                  clustering_method=kmeans_pp_elbow):
         
-        # if label_processing is None:
-        #     data_source = dataset.tensors[0]
-        # else:
-        #     data_source = label_processing(dataset)
+        if label_processing is None:
+            data_source = dataset.tensors[0]
+        else:
+            data_source = label_processing(dataset)
 
         labels = clustering_method(data_source)
         self.cluster_count = max(labels)+1
