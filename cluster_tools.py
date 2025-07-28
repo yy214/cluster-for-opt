@@ -34,7 +34,7 @@ def kmeans_pp_elbow(dataset, distance="euclidian"):
 
 kmeans_cos_elbow = lambda data: kmeans_pp_elbow(data, "cosine")
 
-def logistic_label_process(dataset:TensorDataset):
+def logistic_label_01_process(dataset:TensorDataset):
     data, labels = dataset.tensors
     res = data * (1 - 2*labels).unsqueeze(1).float()
     return res

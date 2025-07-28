@@ -22,6 +22,7 @@ def classlookup(cls):
 
 
 def dimension_reduction(X, dim=2, alg="pca"):
+    if X.shape[1] <= dim: return X 
     if alg == "pca":
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X) 

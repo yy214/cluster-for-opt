@@ -1,10 +1,9 @@
 refactor to make code cleaner
-- cluster: takes labels in account
+- wrapper for dataset loading to avoid loading multiple things?
 
 test on 2D (easier)
 
 check gradients
-put stepsize back to 1/T
 
 fix minibatch svrg -> snapshot epoch change
 fix cluster svrg
