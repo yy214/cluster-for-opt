@@ -1,11 +1,11 @@
-test on 2D (easier)
-- make better clusters
-
-check gradients
+make the cluster sampler faster (torch)
 
 fix minibatch svrg -> snapshot epoch change
 fix cluster svrg
 fix cover
+
+threads
+
 
 https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html#full-implementation 
 - CRAIG?

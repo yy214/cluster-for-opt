@@ -39,7 +39,7 @@ def logistic_label_01_process(dataset:TensorDataset):
     res = data * (1 - 2*labels).unsqueeze(1).float()
     return res
 
-# TODO: optimize this (possible)
+
 class ClusterSampler(Sampler):
     def __init__(self, 
                  dataset: TensorDataset, 
@@ -88,7 +88,6 @@ class ClusterSampler(Sampler):
             self.last_added_probs = np.ones(self.cluster_count) / self.cluster_count
 
     def __iter__(self) -> Iterator[int]:
-        
         for _ in range(self.num_samples//self.batch_size):
             added = np.random.choice(self.cluster_count, self.added_count, p=self.added_probs, replace=False)
             sample_count = self.sample_count[:]
