@@ -24,6 +24,11 @@ def calc_grad(model:nn.Module, data, target, loss_function):
     loss.backward() #compute grad
     return loss
 
+def get_regularized_loss(model, data, labels, criterion, l2):
+    output = model(data)
+    loss = criterion(output, labels)
+    reg_loss = loss + l2/2*sum((p**2).sum() for p in model.parameters())
+    return reg_loss
 
 def solve_problem(model,
                   criterion,
@@ -61,9 +66,11 @@ def solve_problem(model,
         if lr_lambda is not None:
             scheduler.step()
 
-        outputs = model(dataloader.dataset.tensors[0])
-        epoch_loss = criterion(outputs, dataloader.dataset.tensors[1])
-        loss_hist.append(epoch_loss.item())
+        loss_hist.append(get_regularized_loss(model, 
+                                              dataloader.dataset.tensors[0], 
+                                              dataloader.dataset.tensors[1],
+                                              criterion,
+                                              l2).item())
         elapsed_t = time.perf_counter() - begin_t
         timestamps.append(elapsed_t)
         if time_lim and elapsed_t > time_lim:
@@ -138,7 +145,6 @@ def weighted_solver(model,
     return np.array(timestamps), np.array(loss_hist), model
 
 
-# slightly modified from https://github.com/kilianFatras/variance_reduced_neural_networks
 def svrg(model:nn.Module,
          loss_function,
          dataloader:DataLoader,
@@ -150,6 +156,8 @@ def svrg(model:nn.Module,
          lr_lambda=None,
          l2=0):
     """
+    TODO: fix l2 regularization \\
+    slightly modified from https://github.com/kilianFatras/variance_reduced_neural_networks \\
     Function to updated weights with a SVRG backpropagation \\
     args : dataset, loss function, number of epochs, learning rate \\
     return : total_loss_epoch
@@ -218,6 +226,7 @@ def COVER(model:nn.Module,
          l2=0,
          ):
     """
+    TODO: fix l2 regularization \\
     See COVER: a cluster-based variance reduced method for online learning (Yuan et al. 2019)
     """
     assert n_epoch or time_lim, "No limit to the number of iterations"
@@ -298,6 +307,7 @@ def clusterSVRG(model:nn.Module,
          lr_lambda=None
          ):
     """
+    TODO: fix l2 regularization \\
     See https://arxiv.org/abs/1602.02151
     """
     assert n_epoch or time_lim, "No limit to the number of iterations"
