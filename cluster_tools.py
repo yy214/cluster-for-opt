@@ -72,46 +72,25 @@ class ClusterSampler(Sampler):
                              for i in range(self.cluster_count)]
 
         self.added_count = self.batch_size - sum(self.sample_count)
-        self.added_probs = torch.tensor([self.cluster_sizes[i]*batch_size%self.num_samples
-                             for i in range(self.cluster_count)]).float()
-        remain = self.added_probs.sum()
-        if remain != 0:
-            self.added_probs /= remain
-        else:
-            self.added_probs = torch.ones(self.cluster_count) / self.cluster_count
 
         # we miss num_samples % batch_size elements in the process so we add them back
         self.last_batch_size = self.num_samples%self.batch_size
         self.last_sample_count = [len(self.clusters[i])*self.last_batch_size//self.num_samples
                                   for i in range(self.cluster_count)]
         self.last_added_count = self.last_batch_size - sum(self.last_sample_count)
-        self.last_added_probs =  torch.tensor([len(self.clusters[i])*self.last_batch_size%self.num_samples
-                             for i in range(self.cluster_count)]).float()
-        
-        last_remain = self.last_added_probs.sum()
-        if last_remain != 0:
-            self.last_added_probs /= last_remain
-        else:
-            self.last_added_probs = torch.ones(self.cluster_count) / self.cluster_count
 
 
     def __iter__(self) -> Iterator[int]:
         
         for _ in range(self.num_samples//self.batch_size):
-            added = torch.multinomial(self.added_probs, self.added_count)
-            sample_count = self.sample_count[:]
-            for i_added in added:
-                sample_count[i_added] += 1
-            
             for i_cluster in range(self.cluster_count):
-                selected_ids = torch.randint(self.cluster_sizes[i_cluster], (sample_count[i_cluster],))
+                selected_ids = torch.randint(self.cluster_sizes[i_cluster], (self.sample_count[i_cluster],))
                 yield from self.clusters[i_cluster][selected_ids]
-                
-        added = torch.multinomial(self.last_added_probs, self.last_added_count)
-        sample_count = self.last_sample_count[:]
-        for i_added in added:
-            sample_count[i_added] += 1
+            
+            yield from torch.randint(self.num_samples, (self.added_count,))
         
         for i_cluster in range(self.cluster_count):
-            selected_ids = torch.randint(self.cluster_sizes[i_cluster], (sample_count[i_cluster],))
+            selected_ids = torch.randint(self.cluster_sizes[i_cluster], (self.last_sample_count[i_cluster],))
             yield from self.clusters[i_cluster][selected_ids]
+        
+        yield from torch.randint(self.num_samples, (self.last_added_count,))
