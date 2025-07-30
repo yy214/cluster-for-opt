@@ -1,10 +1,17 @@
-make the cluster sampler faster (torch)
+- proof of concept on well split
+- fix square differences
+- check cluster variances again 
+    > is it curse of dimensionality? why 9 clusters
+    > is it too much clusters?
+    > is it better to split by labels? (weird: otherwise we would know about it)
 
-fix minibatch svrg -> snapshot epoch change
+make the cluster sampler faster (torch)
+threads
+
+fix minibatch svrg -> snapshot epoch change i guess
 fix cluster svrg
 fix cover
 
-threads
 
 
 https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html#full-implementation 
