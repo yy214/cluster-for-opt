@@ -7,7 +7,7 @@ from torch.optim.lr_scheduler import LambdaLR
 import numpy as np
 
 from sklearn.cluster import KMeans
-from cluster_tools import kmeans_pp_elbow
+from cluster_tools import kmeans_pp_elbow, get_clusters
 
 from utils import clone_model
 
@@ -218,8 +218,7 @@ def COVER(model:nn.Module,
          sampler:Sampler,
          *model_args,
          n_epoch,
-         label_processing=None,
-         cluster_method=kmeans_pp_elbow,
+         cluster_labels,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function
          lr_lambda=None,
@@ -236,15 +235,9 @@ def COVER(model:nn.Module,
     dataset, targets = data.tensors
     n = len(dataset)
 
-    if label_processing is None:
-        data_source = dataset.tensors[0]
-    else:
-        data_source = label_processing(dataset)
-
-    labels = kmeans_pp_elbow(data_source)
-    cluster_count = max(labels)+1
+    cluster_count = max(cluster_labels)+1
     cluster_probs = np.zeros(cluster_count)
-    for l in labels:
+    for l in cluster_labels:
         cluster_probs[l] += 1
     cluster_probs /= np.sum(cluster_probs)
 
@@ -269,19 +262,19 @@ def COVER(model:nn.Module,
         
         for data_id in sampler:
             batch = dataset[data_id]
-            target_batch = labels[data_id]
+            target_batch = targets[data_id]
             model.zero_grad()
             loss = calc_grad(model, batch, target_batch, loss_function)
             running_loss += loss.item() / n
             
             curr_cluster = 0
-            curr_cluster = labels[data_id]
+            curr_cluster = cluster_labels[data_id]
             
             for param, g_c, g_b in zip(model.parameters(),
                                        g_cluster[curr_cluster],
                                        g_bar):
                 grad = param.grad.data
-                param.data.sub_(learning_rate*(grad - g_c + g_b + l2*param.data))
+                param.data.sub_(lr*(grad - g_c + g_b + l2*param.data))
                 g_c.add_(cluster_relax[curr_cluster]*(g_c - grad))
                 g_b.add_(relax*(g_c - grad))
         
@@ -300,8 +293,7 @@ def clusterSVRG(model:nn.Module,
          sampler:Sampler,
          *model_args,
          n_epoch,
-         label_processing=None,
-         cluster_method=kmeans_pp_elbow,
+         cluster_labels,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function
          lr_lambda=None
@@ -317,15 +309,9 @@ def clusterSVRG(model:nn.Module,
     dataset, targets = data.tensors
     n = len(dataset)
 
-    if label_processing is None:
-        data_source = dataset.tensors[0]
-    else:
-        data_source = label_processing(dataset)
-
-    labels = kmeans_pp_elbow(data_source)
-    cluster_count = max(labels)+1
+    cluster_count = max(cluster_labels)+1
     cluster_probs = np.zeros(cluster_count)
-    for l in labels:
+    for l in cluster_labels:
         cluster_probs[l] += 1
     cluster_probs /= np.sum(cluster_probs)
 
@@ -342,7 +328,7 @@ def clusterSVRG(model:nn.Module,
         previous_net = clone_model(model, *model_args) # for calculating gradient each step
         previous_net.zero_grad()
         total_loss_epoch.append(
-            calc_grad(previous_net, dataset, labels, loss_function).item())
+            calc_grad(previous_net, dataset, targets, loss_function).item())
         previous_net_grads = [p.grad.data for p in previous_net.parameters()]
 
         z_cluster = [[torch.zeros_like(p) for p in model.parameters()]
@@ -358,7 +344,7 @@ def clusterSVRG(model:nn.Module,
             model.zero_grad()
             curr_loss = calc_grad(model, batch, target_batch, loss_function)
             
-            curr_cluster = labels[data_id]
+            curr_cluster = cluster_labels[data_id]
             for param, g_c, g_c_total, p_prev, g_total, in \
                     zip(model.parameters(),
                         z_cluster[curr_cluster],
@@ -367,7 +353,7 @@ def clusterSVRG(model:nn.Module,
                         previous_net_grads):
                 grad = param.grad.data
                 prev_grad = p_prev.grad.data
-                param.data.sub_(learning_rate*(g_total + g_c_total + grad - (g_c + prev_grad)))
+                param.data.sub_(lr*(g_total + g_c_total + grad - (g_c + prev_grad)))
                 g_c_total.add_(cluster_probs[curr_cluster]*(grad - prev_grad - g_c))
                 g_c = grad - prev_grad
         

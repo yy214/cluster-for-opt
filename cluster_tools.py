@@ -40,20 +40,28 @@ def logistic_label_01_process(dataset:TensorDataset):
     res = data * (1 - 2*labels).unsqueeze(1).float()
     return res
 
+def logistic_label_pm1_process(dataset:TensorDataset):
+    data, labels = dataset.tensors
+    res = data * labels.unsqueeze(1).float()
+    return res
+
+def get_clusters(dataset: TensorDataset, 
+                 label_processing=None, 
+                 clustering_method=kmeans_pp_elbow):
+    if label_processing is None:
+            data_source = dataset.tensors[0]
+    else:
+        data_source = label_processing(dataset)
+
+    labels = clustering_method(data_source)
+    return labels
 
 class ClusterSampler(Sampler):
     def __init__(self, 
-                 dataset: TensorDataset, 
+                 num_samples,
                  batch_size, 
-                 label_processing=None,
-                 clustering_method=kmeans_pp_elbow):
+                 labels):
         
-        if label_processing is None:
-            data_source = dataset.tensors[0]
-        else:
-            data_source = label_processing(dataset)
-
-        labels = clustering_method(data_source)
         self.cluster_count = max(labels)+1
         self.cluster_sizes = [0] * self.cluster_count
         for l in labels:
@@ -65,7 +73,7 @@ class ClusterSampler(Sampler):
             self.clusters[l][counts[l]] = i
             counts[l] += 1
 
-        self.num_samples = len(data_source)
+        self.num_samples = num_samples
         self.batch_size = batch_size
 
         self.sample_count = [self.cluster_sizes[i]*batch_size//self.num_samples
