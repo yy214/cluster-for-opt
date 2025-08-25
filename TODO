@@ -1,16 +1,19 @@
-- proof of concept on well split + real-life low dimension data
+- proof of concept on well split + real-life low dimension 
+    > still problem
 - check cluster variances again 
-    > is it curse of dimensionality? why 9 clusters
-    > is it too much clusters?
+    > is it curse of dimensionality? YES
+    > is it too much clusters? MOST IMPORTANTLY SOME ARE TOO SMALL
     > is it better to split by labels? (weird: otherwise we would know about it)
-    > cluster again close to the optimum
+    > cluster again close to the optimum DONE AND NOT MUCH BETTER
+
+distance-based clustering -> FAISS or E2LSH
 
 make the cluster sampler faster (torch)
 threads
 
 fix minibatch svrg -> snapshot epoch change i guess
 fix cluster svrg
-fix cover
+fix cover (assumes we need to fix variances still or it's not worth it)
 
 
 

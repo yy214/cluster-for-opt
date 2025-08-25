@@ -7,8 +7,34 @@ import torch
 from torch.utils.data import Sampler, TensorDataset
 from collections.abc import Sized, Iterator
 
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.cluster import kmeans_plusplus
+import matplotlib.pyplot as plt
 
+def display_clusters(data, labels, k, centroids=None):
+    for i in range(k):
+        plt.scatter(data[labels==i,0], data[labels==i,1])
+    if centroids is not None:
+        plt.scatter(centroids[:,0], centroids[:,1], color="black")
+
+def alt_kmeans(X, k, max_iter=100, tol=1e-4):
+    centroids, _ = kmeans_plusplus(X, n_clusters=k, random_state=42)
+
+    for it in range(max_iter):
+        # d[k, l] = dist between X[k,:] and C[l,:]
+        distances = np.sum((X[:, np.newaxis, :] - centroids[np.newaxis, :, :])**2, axis=2)
+        if it == 0:
+            labels = np.argmin(distances, axis=1)
+        else:
+            labels = np.argmin(distances*n_elem, axis=1)
+        n_elem = np.bincount(labels, minlength=k)
+        new_centroids = np.array([X[labels == j].mean(axis=0) for j in range(k)])
+
+        if np.all(np.abs(new_centroids - centroids) < tol):
+            break
+        
+        # Update centroids for the next iteration
+        centroids = new_centroids
+    return labels
 
 def kmeans_elbow(dataset, cap=25):
     lim = min(int(np.sqrt(len(dataset))), cap)

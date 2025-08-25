@@ -9,3 +9,4 @@ scikit-learn-extra
 matplotlib
 tqdm
 kneed
+faiss-cpu
