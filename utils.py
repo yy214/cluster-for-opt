@@ -5,6 +5,34 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
+class UnionFind:
+    def __init__(self, size):
+        self.parent = list(range(size))
+        self.rank = [0]*size
+
+    def find(self, x):
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])
+            return self.parent[x]
+        else: return x
+    
+    def union(self, x, y):
+        r"""also returns True / False for "changes made"""
+
+        x_rep = self.find(x)
+        y_rep = self.find(y)
+
+        if x_rep == y_rep: 
+            return False
+        
+        if self.rank[x_rep] < self.rank[y_rep]:
+            self.parent[x_rep] = y_rep
+        else:
+            self.parent[y_rep] = x_rep
+            if self.rank[x_rep] == self.rank[y_rep]:
+                self.rank[x_rep] += 1
+        return True
+
 def clone_model(model:Module, *args):
     # Create a new instance of the same class
     model_copy = type(model)(*args)
