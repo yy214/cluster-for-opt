@@ -87,22 +87,15 @@ def get_clusters(dataset: TensorDataset,
     return labels
 
 class ClusterSampler(Sampler):
-    # modified from https://arxiv.org/abs/1405.3080
     def __init__(self, 
                  num_samples,
                  batch_size, 
-                 labels,
-                 n_i=None,
-                 v_i=None):
+                 labels):
         
-        if n_i is None:
-            self.cluster_count = max(labels)+1
-            self.cluster_sizes = np.zeros(self.cluster_count)
-            for l in labels:
-                self.cluster_sizes[l] += 1
-        else:
-            self.cluster_count = len(n_i)
-            self.cluster_sizes = n_i
+        self.cluster_count = max(labels)+1
+        self.cluster_sizes = [0] * self.cluster_count
+        for l in labels:
+            self.cluster_sizes[l] += 1
         
         self.clusters = [torch.zeros(self.cluster_sizes[i]).int() for i in range(self.cluster_count)]
         counts = [0] * self.cluster_count
@@ -112,35 +105,17 @@ class ClusterSampler(Sampler):
 
         self.num_samples = num_samples
         self.batch_size = batch_size
-        
-        if v_i is None:
-            b_i = n_i
-        else:
-            b_i = n_i * np.sqrt(v_i)
-        
-        dec_batch_size = batch_size*(b_i / np.sum(b_i))
-        self.sample_count = np.int32(dec_batch_size)
-        self.added_count = self.batch_size - np.sum(self.sample_count)
-        self.probs = torch.tensor(dec_batch_size - self.sample_count).float()
-        remain = self.probs.sum()
-        if remain != 0:
-            self.probs /= remain
-        else:
-            self.probs = torch.ones(self.cluster_count) / self.cluster_count
+
+        self.sample_count = [self.cluster_sizes[i]*batch_size//self.num_samples
+                             for i in range(self.cluster_count)]
+
+        self.added_count = self.batch_size - sum(self.sample_count)
 
         # we miss num_samples % batch_size elements in the process so we add them back
         self.last_batch_size = self.num_samples%self.batch_size
-        dec_last_batch_size = self.last_batch_size*(b_i / np.sum(b_i))
-        self.last_sample_count = np.int32(dec_last_batch_size)
+        self.last_sample_count = [len(self.clusters[i])*self.last_batch_size//self.num_samples
+                                  for i in range(self.cluster_count)]
         self.last_added_count = self.last_batch_size - sum(self.last_sample_count)
-        
-        self.last_probs = dec_last_batch_size - self.last_sample_count
-
-        last_remain = self.last_added_probs.sum()
-        if last_remain != 0:
-            self.last_probs /= last_remain
-        else:
-            self.last_probs = torch.ones(self.cluster_count) / self.cluster_count
 
     def __iter__(self) -> Iterator[int]:
         for _ in range(self.num_samples//self.batch_size):
@@ -148,15 +123,13 @@ class ClusterSampler(Sampler):
                 selected_ids = torch.randint(self.cluster_sizes[i_cluster], (self.sample_count[i_cluster],))
                 yield from self.clusters[i_cluster][selected_ids]
             
-            add_ids = torch.multinomial(self.probs, self.added_count, replacement=True)
-            yield from self.clusters[i_cluster][add_ids]
+            yield from torch.randint(self.num_samples, (self.added_count,))
         
         for i_cluster in range(self.cluster_count):
             selected_ids = torch.randint(self.cluster_sizes[i_cluster], (self.last_sample_count[i_cluster],))
             yield from self.clusters[i_cluster][selected_ids]
         
-        add_ids = torch.multinomial(self.last_probs, self.last_added_count, replacement=True)
-        yield from self.clusters[i_cluster][add_ids]
+        yield from torch.randint(self.num_samples, (self.last_added_count,))
 
 
 def approx_nearest_clustering(vectors, edge_count = 16, knn=10, wanted_cluster_count=8):
