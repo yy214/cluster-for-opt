@@ -7,11 +7,16 @@ from torch.optim.lr_scheduler import LambdaLR
 import numpy as np
 
 from sklearn.cluster import KMeans
-from cluster_tools import kmeans_pp_elbow, get_clusters
+from cluster_tools import kmeans_pp_elbow, get_clusters, alt_kmeans
 
 from utils import clone_model
 
 import time
+
+# design choice to calculate the loss using a parallel thread: 
+# different sampling methods as just "successive" 
+# -> can't just sum everything to get the total loss after epoch
+
 
 def calc_grad(model:nn.Module, data, target, loss_function):
     """
@@ -78,8 +83,6 @@ def solve_problem(model,
     
     return np.array(timestamps), np.array(loss_hist), model
 
-
-
 def weighted_solver(model,
                     criterion,
                     optimizer,
@@ -90,6 +93,8 @@ def weighted_solver(model,
                     verbose=False,
                     lr_lambda=None,
                     ):
+    # used for https://arxiv.org/pdf/2007.04532
+    
     assert n_iter or time_lim, "No limit to the number of iterations"
 
     # if verbose:

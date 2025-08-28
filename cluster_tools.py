@@ -14,33 +14,67 @@ import faiss
 import heapq
 from utils import UnionFind
 
+import warnings
+
 def display_clusters(data, labels, k, centroids=None, alpha=0.5):
     for i in range(k):
         plt.scatter(data[labels==i,0], data[labels==i,1], alpha=alpha)
     if centroids is not None:
         plt.scatter(centroids[:,0], centroids[:,1], color="black")
 
-def alt_kmeans(X, k, max_iter=100, tol=1e-4):
-    centroids, _ = kmeans_plusplus(X, n_clusters=k, random_state=42)
+def alt_kmeans(data, k, max_iter=100, tol=1e-4):
+    # useful for https://arxiv.org/abs/1405.3080
+    # algorithm from https://arxiv.org/pdf/2007.04532
+    centroids, _ = kmeans_plusplus(data, n_clusters=k)
 
     for it in range(max_iter):
         # d[k, l] = dist between X[k,:] and C[l,:]
-        distances = np.sum((X[:, np.newaxis, :] - centroids[np.newaxis, :, :])**2, axis=2)
+        distances = np.sum((data[:, np.newaxis, :] - centroids[np.newaxis, :, :])**2, axis=2)
         if it == 0:
             labels = np.argmin(distances, axis=1)
         else:
             labels = np.argmin(distances*n_elem, axis=1)
         n_elem = np.bincount(labels, minlength=k)
-        new_centroids = np.array([X[labels == j].mean(axis=0) for j in range(k)])
+
+        # because everything breaks in the rare case where one of the n_elem is 0
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", RuntimeWarning)
+            try:
+                new_centroids = np.array([data[labels == j].mean(axis=0) for j in range(k)])
+            except:
+                warnings.warn("One of the clusters became empty, retrying", UserWarning)
+                return alt_kmeans(data, k, max_iter, tol)
 
         if np.all(np.abs(new_centroids - centroids) < tol):
             break
         
         # Update centroids for the next iteration
         centroids = new_centroids
-    return labels
+    
+    # finding clusters
+    clusters = [np.zeros(n_elem[i], dtype=np.int32) for i in range(k)]
+    counts = [0]*k
+    for i, l in enumerate(labels):
+        clusters[l][counts[l]] = i
+        counts[l] += 1
 
-def kmeans_elbow(dataset, cap=25):
+    sq_dist_sums = np.array([np.sum((data[clusters[j],:] - centroids[j, :])**2) for j in range(k)])
+
+    inertia = np.sum(np.sqrt(n_elem*sq_dist_sums))
+    return labels, inertia
+
+def alt_elbow(data, cap=16):
+    lim = min(int(np.sqrt(len(data))), cap)
+    K = range(1, lim)
+    inertias = []
+    for k in K:
+        _, inertia = alt_kmeans(data, k)
+        inertias.append(inertia)
+    
+    kl = KneeLocator(K, inertias, curve="convex", direction="decreasing")
+    return alt_kmeans(data, kl.elbow)[0]
+
+def kmeans_elbow_aux(dataset, cap=16):
     lim = min(int(np.sqrt(len(dataset))), cap)
     K = range(1, lim)
     inertias = []
@@ -58,7 +92,7 @@ def kmeans_pp_elbow(dataset, distance="euclidian"):
         data = preprocessing.normalize(dataset)
     else:
         raise NotImplementedError("Only 'euclidian' or 'cosine'") 
-    ideal_k = kmeans_elbow(data)
+    ideal_k = kmeans_elbow_aux(data)
     kmeans = KMeans(n_clusters=ideal_k).fit(data)
     
     return kmeans.labels_

@@ -1,3 +1,5 @@
+code cleanup AFTER submitting the paper
+
 - proof of concept on well split + real-life low dimension 
     > still problem
 - check cluster variances again 
@@ -5,8 +7,6 @@
     > is it too much clusters? MOST IMPORTANTLY SOME ARE TOO SMALL
     > is it better to split by labels? (weird: otherwise we would know about it)
     > cluster again close to the optimum DONE AND NOT MUCH BETTER
-
-distance-based clustering -> FAISS or E2LSH
 
 make the cluster sampler faster (torch)
 threads
