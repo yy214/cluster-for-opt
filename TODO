@@ -1,5 +1,7 @@
 code cleanup AFTER submitting the paper
 
+get variance of grads over time for sgd + compare to 
+
 - proof of concept on well split + real-life low dimension 
     > still problem
 - check cluster variances again 
@@ -21,3 +23,10 @@ https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html#fu
 - CRAIG?
 - gradient cluster from Faghri?
 
+
+
+CLEANUP:
+- version in the requirements (or else everything breaks in a few years)
+- text
+- cleaner code (spaces and stuff idk the name of it)
+- saving simulations

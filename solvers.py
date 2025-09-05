@@ -83,6 +83,64 @@ def solve_problem(model,
     
     return np.array(timestamps), np.array(loss_hist), model
 
+
+def full_batch_corresp(model,
+                  criterion,
+                  optimizer_class,
+                  dataset:TensorDataset,
+                  corresp_batch_size,
+                  n_epoch:int=100, 
+                #   time_lim=None, # in seconds
+                  verbose=False, 
+                  lr=0.001,
+                  lr_lambda=None,
+                  l2=0):
+    r"""
+    Checking if we have reached the same performance as 
+    """
+    # assert n_epoch or time_lim, "No limit to the number of iterations"
+
+    if verbose:
+        print("Building models...")
+    optimizer = optimizer_class(model.parameters(), lr=lr, weight_decay=l2)
+
+    if lr_lambda is not None:
+        scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+
+    data, full_labels = dataset.tensors
+
+    n = len(dataset)
+    loss_hist = []
+    timestamps = []
+    begin_t = time.perf_counter()
+
+    corresp_iter_per_epoch = int(np.ceil(n/corresp_batch_size))
+    n_iter = n_epoch*corresp_iter_per_epoch
+    # if n_epoch is None:
+    #     n_epoch = 100000
+    for i in tqdm(range(n_iter)):
+        optimizer.zero_grad()
+        loss = calc_grad(model, data, full_labels, criterion)
+        optimizer.step()
+        
+        if i%corresp_iter_per_epoch != corresp_iter_per_epoch-1: continue
+
+        if lr_lambda is not None:
+            scheduler.step()
+
+        loss_hist.append(get_regularized_loss(model, 
+                                              data, 
+                                              full_labels,
+                                              criterion,
+                                              l2).item())
+        elapsed_t = time.perf_counter() - begin_t
+        timestamps.append(elapsed_t)
+        # if time_lim and elapsed_t > time_lim:
+            # break
+    
+    return np.array(timestamps), np.array(loss_hist), model
+
+
 def weighted_solver(model,
                     criterion,
                     optimizer,
@@ -149,6 +207,130 @@ def weighted_solver(model,
     
     return np.array(timestamps), np.array(loss_hist), model
 
+def alt_solve_problem(model,
+                      criterion,
+                      optimizer_class,
+                      datasource:TensorDataset,
+                      batch_size,
+                      cluster_labels=None,
+                      v_i=None,
+                      n_epoch: int=100, 
+                      time_lim=None, # in seconds
+                      verbose=False, 
+                      lr=0.001,
+                      lr_lambda=None,
+                      l2=0):
+    # modified from https://arxiv.org/abs/1405.3080
+    
+    assert n_epoch or time_lim, "No limit to the number of iterations"
+
+    if verbose:
+        print("Building models...")
+    optimizer = optimizer_class(model.parameters(), lr=lr, weight_decay=l2)
+
+    if lr_lambda is not None:
+        scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+
+    data, full_labels = datasource.tensors
+    n = len(datasource)
+
+    cluster_count = max(cluster_labels)+1
+
+    n_i = torch.zeros(cluster_count).int()
+    for l in cluster_labels:
+        n_i[l] += 1
+
+    clusters = [np.zeros(n_i[i], dtype=np.int32) for i in range(cluster_count)]
+    counts = [0]*cluster_count
+    for i, l in enumerate(cluster_labels):
+        clusters[l][counts[l]] = i
+        counts[l] += 1
+
+    if v_i is None:
+        v_i = torch.tensor(
+            [((data[clusters[j],:] - data[clusters[j],:].mean(axis=0))**2).sum()
+            for j in range(cluster_count)])
+    b_i = n_i * torch.sqrt(v_i)
+
+
+    # calculating the actual sampled size as we will likely not have something decimal
+    dec_batch_size = batch_size*(b_i / b_i.sum())
+    print(dec_batch_size, n_i, v_i)
+    sample_count = dec_batch_size.int()
+    added_count = batch_size - sample_count.sum()
+    probs = dec_batch_size - sample_count
+    
+    remain = probs.sum()
+    if remain != 0:
+        probs /= remain
+    else:
+        probs = torch.ones(cluster_count) / cluster_count
+
+    # we miss num_samples % batch_size elements in the process so we add them back
+    last_batch_size = n%batch_size
+    loop_count = n//batch_size + (last_batch_size > 0)
+
+    dec_last_batch_size = last_batch_size*(b_i / b_i.sum())
+    last_sample_count = dec_last_batch_size.int()
+    last_added_count = last_batch_size - last_sample_count.sum()
+    
+    last_probs = dec_last_batch_size - last_sample_count
+
+    last_remain = last_probs.sum()
+    if last_remain != 0:
+        last_probs /= last_remain
+    else:
+        last_probs = torch.ones(cluster_count) / cluster_count
+
+    loss_hist = []
+    timestamps = []
+    begin_t = time.perf_counter()
+    if n_epoch is None:
+        n_epoch = 100000
+    for i in tqdm(range(n_epoch)):
+        # design choice here: match torch samplers which sample exactly n elements 
+        for j in range(loop_count):
+            optimizer.zero_grad()
+            batch_loss = 0
+
+            if j < loop_count-1:
+                p = probs
+                s_c = sample_count.detach().clone()
+                a_c = added_count
+            else:
+                p = last_probs
+                s_c = last_sample_count.detach().clone()
+                a_c = last_added_count
+
+            add_ids = torch.multinomial(p, a_c, replacement=True)
+            for a in add_ids:
+                s_c[a] += 1
+            for i_cluster in range(cluster_count):
+                selected_c_ids = torch.randint(n_i[i_cluster], 
+                                               (s_c[i_cluster],))
+                ids = clusters[i_cluster][selected_c_ids]
+                sub_batch, sub_labels = datasource[ids]
+                # get subbatch
+                res = model(sub_batch)
+                batch_loss += n_i[i_cluster]*criterion(res, sub_labels)
+                batch_loss /= n
+            batch_loss.backward()
+            optimizer.step()
+        
+        if lr_lambda is not None:
+            scheduler.step()
+
+        loss_hist.append(get_regularized_loss(model, 
+                                              data, 
+                                              full_labels,
+                                              criterion,
+                                              l2).item())
+        elapsed_t = time.perf_counter() - begin_t
+        timestamps.append(elapsed_t)
+        if time_lim and elapsed_t > time_lim:
+            break
+    
+    return np.array(timestamps), np.array(loss_hist), model
 
 def svrg(model:nn.Module,
          loss_function,
