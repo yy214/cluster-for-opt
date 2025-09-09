@@ -99,14 +99,22 @@ def kmeans_pp_elbow(dataset, distance="euclidian"):
 
 kmeans_cos_elbow = lambda data: kmeans_pp_elbow(data, "cosine")
 
-def logistic_label_01_process(dataset:TensorDataset):
+def logistic_label_pm1_process(dataset:TensorDataset):
+    r"""
+    Considers f_i(w) = f(y_ix_i^\top \cdot w) 
+    -> replaces w with y_ix_i^\top \cdot w before clustering
+    """
     data, labels = dataset.tensors
-    res = data * (1 - 2*labels).unsqueeze(1).float()
+    res = -data * labels.unsqueeze(1).float()
     return res
 
-def logistic_label_pm1_process(dataset:TensorDataset):
+
+def logistic_label_01_process(dataset:TensorDataset):
+    r"""
+    Converts the 0/1 labels into +/-1 labels then does the same as previous
+    """
     data, labels = dataset.tensors
-    res = data * labels.unsqueeze(1).float()
+    res = data * (1 - 2*labels).unsqueeze(1).float()
     return res
 
 def get_clusters(dataset: TensorDataset, 
