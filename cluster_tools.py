@@ -99,6 +99,10 @@ def kmeans_pp_elbow(dataset, distance="euclidian"):
 
 kmeans_cos_elbow = lambda data: kmeans_pp_elbow(data, "cosine")
 
+def no_process(dataset:TensorDataset):
+    data, _ = dataset.tensors
+    return data
+
 def logistic_label_pm1_process(dataset:TensorDataset):
     r"""
     Considers f_i(w) = f(y_ix_i^\top \cdot w) 
