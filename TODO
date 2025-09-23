@@ -1,35 +1,17 @@
 code cleanup AFTER submitting the paper
-
-get variance of grads over time for sgd + compare to 
-
-- proof of concept on well split + real-life low dimension 
-    > still problem
-- check cluster variances again 
-    > is it curse of dimensionality? YES
-    > is it too much clusters? MOST IMPORTANTLY SOME ARE TOO SMALL
-    > is it better to split by labels? (weird: otherwise we would know about it)
-    > cluster again close to the optimum DONE AND NOT MUCH BETTER
+- correct the 01 -> +/- 1
+- check if everything works
+- fix the clone model (or nuke it as it's for svrg)
+- text in readme + in the notebook
+- saving simulations
+- cleaner code (spaces and stuff idk the name of it)
 
 
-set the seeds for deterministic results (+ make sure that 10 experiments are different)
+can check gradient-cluster from faghri
 
-make the cluster sampler faster (torch)
+
 threads
 
 fix minibatch svrg -> snapshot epoch change i guess
 fix cluster svrg
 fix cover (assumes we need to fix variances still or it's not worth it)
-
-
-
-https://docs.pytorch.org/tutorials/beginner/basics/optimization_tutorial.html#full-implementation 
-- CRAIG?
-- gradient cluster from Faghri?
-
-
-
-CLEANUP:
-- version in the requirements (or else everything breaks in a few years)
-- text
-- cleaner code (spaces and stuff idk the name of it)
-- saving simulations

@@ -1,5 +1,4 @@
 get 
-- https://github.com/baharanm/craig
 - https://github.com/fartashf/gvar_code/
 - https://github.com/kilianFatras/variance_reduced_neural_networks
 - sources of data
