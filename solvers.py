@@ -140,6 +140,55 @@ def full_batch_corresp(model,
     
     return np.array(timestamps), np.array(loss_hist), model
 
+def successive_cluster_solver(model,
+                              criterion,
+                              optimizer,
+                              datasource: TensorDataset,
+                              intended_batch_size:int,
+                              cluster_labels,
+                              clustered_sampling: bool=False, # for non-clustered corresp
+                              n_epoch: int=100,
+                              lr=1e-3,
+                              lr_lambda=None,
+                              l2=0):
+    if lr_lambda is not None:
+        scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
+
+    n = len(datasource)
+    dataset, labels = datasource.tensors
+
+    cluster_count = max(labels)+1
+    clusters = [[] for _ in range(cluster_count)]
+    cluster_sizes = np.zeros(cluster_count, dtype=np.int32)
+    for i, l in enumerate(labels):
+        clusters[l].append(i)
+        cluster_sizes[l] += 1
+
+    clusters = [torch.from_numpy(c) for c in clusters]
+
+    intended_iter_per_epoch = int(np.ceil(n/intended_batch_size))
+
+    base_num_cluster_elem = cluster_sizes // intended_iter_per_epoch
+    added_num = cluster_sizes % intended_iter_per_epoch
+
+    add_timestamps = np.sort(added_num)
+
+    loss_hist = []
+
+    for i in tqdm(range(n_epoch)):
+        epoch_loss = 0
+        if clustered_sampling:
+            for c in clusters:
+                # shuffle
+        else:
+            # shuffle whole thing
+        for j in range(intended_iter_per_epoch):
+            if clustered_sampling:
+                added = (j < added_num)
+            else:
+                added_count
+
+    return np.array(loss_hist), model
 
 def weighted_solver(model,
                     criterion,
@@ -148,16 +197,11 @@ def weighted_solver(model,
                     n_iter: int=100000,
                     cluster_method=kmeans_pp_elbow, 
                     time_lim=None, # in seconds
-                    verbose=False,
                     lr_lambda=None,
                     ):
     # used for https://arxiv.org/pdf/2007.04532
     
     assert n_iter or time_lim, "No limit to the number of iterations"
-
-    # if verbose:
-        # print("Building models...")
-    # optimizer = optimizer_class(model.parameters())
 
     if lr_lambda is not None:
         scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
@@ -165,11 +209,11 @@ def weighted_solver(model,
     n = len(datasource)
     dataset, labels = datasource.tensors
 
-    labels = cluster_method(dataset)
-    cluster_count = max(labels)+1
+    cluster_labels = cluster_method(dataset)
+    cluster_count = max(cluster_labels)+1
     clusters = [[] for _ in range(cluster_count)]
     cluster_sizes = np.zeros(cluster_count)
-    for i, l in enumerate(labels):
+    for i, l in enumerate(cluster_labels):
         clusters[l].append(i)
         cluster_sizes[l] += 1
     cluster_weights = torch.from_numpy(cluster_sizes) / n
@@ -335,8 +379,8 @@ def alt_solve_problem(model,
 def svrg(model:nn.Module,
          loss_function,
          dataloader:DataLoader,
-         *model_args,
          n_epoch,
+         *model_args,
          time_lim=None,
          learning_rate=0.001, # for correspondance with torch.optim function 
          print_freq=None,

@@ -19,13 +19,13 @@ class Config:
     repeat_times: int=10
 
     l2: float=1e-4
-    bias: bool=False
+    bias: bool=True
 
     lr: float=2
     lr_lambda: Callable[[float], float]=lambda epoch: 5 / (epoch+1)
     optimizer_class: Type[Optimizer]=SGD
     criterion: Callable[[Tensor, Tensor], Tensor]=log_criterion
-    processing: Callable[[TensorDataset, Tensor]]=logistic_label_pm1_process
+    processing: Callable[[TensorDataset, Tensor], Tensor]=logistic_label_pm1_process
 
 
 # learning rate for phishing: lr=0.2
@@ -36,6 +36,8 @@ configs = {
     "phishing": Config("phishing", lr=0.2),
     "white_wine": Config("white_wine", 
                          lr=8e-5, 
+                         bias=False,
                          criterion=least_squares_crit,
-                         processing=no_process)
+                         processing=no_process),
+    "simple_reg": Config("simple_reg", lr=0.1, l2=0)
 }

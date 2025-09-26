@@ -13,8 +13,8 @@ class SimpleModel(nn.Module):
         return self.layer(ai)
 
 def least_squares_crit(ax: torch.Tensor, b: torch.Tensor):
-    if ax.shape[0] != 1:
-        raise ValueError(f"Expected shape (1, n) for ax, got {ax.shape}")
+    if ax.dim() > 1 and ax.shape[1] != 1:
+        raise ValueError(f"Expected shape (n,) or (n, 1) for ax, got {ax.shape}")
     return (1/2*((ax.flatten() - b)**2)).mean()
 
 def log_criterion(pred: torch.Tensor, labels: torch.Tensor):

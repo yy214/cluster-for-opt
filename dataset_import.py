@@ -1,4 +1,3 @@
-
 import numpy as np
 import pandas as pd
 
@@ -11,6 +10,8 @@ from sklearn.datasets import make_blobs
 
 from sklearn.datasets import load_svmlight_file
 import warnings
+
+from configs import configs
 
 def make_2d_classification(N=4000, well_split=True):
     torch.manual_seed(42)
@@ -71,7 +72,11 @@ def read_csv_tensordataset(filename, sep=";"):
     y = torch.from_numpy(df.iloc[:, -1].values).float()
     return TensorDataset(X, y)
 
-
+def gen_custom_reg_dataset(n=1000, dim=2000):
+    A = torch.randn((n, dim))
+    opt_weights = torch.randn(dim)
+    b = A@opt_weights
+    return TensorDataset(A, b)
 
 def load_svm_classif_tensor(filename, process=None):
     X, y = load_svmlight_file(filename)
@@ -99,3 +104,7 @@ def load_dataset(dataset_name, **kwargs):
         return load_svm_classif_tensor("./data/phishing_dataset.txt", "0 1")
     elif dataset_name == "white_wine":
         return read_csv_tensordataset("./data/winequality-white.csv")
+    elif dataset_name == "simple_reg":
+        return gen_custom_reg_dataset(**kwargs)
+    else:
+        raise ValueError(f"Unknown dataset name. Only supported: {list(configs.keys())}")

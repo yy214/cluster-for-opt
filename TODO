@@ -1,7 +1,12 @@
+new experiments (fast)
+- linear regression with N < DIM -> debug
+- clustering for successive
+- if nothing works, show that cluster kaczmarz works
+
+
+
 code cleanup AFTER submitting the paper
-- correct the 01 -> +/- 1
-- check if everything works
-- fix the clone model (or nuke it as it's for svrg)
+- remove timestamps which don't make sense anymore
 - text in readme + in the notebook
 - saving simulations
 - cleaner code (spaces and stuff idk the name of it)
