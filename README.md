@@ -27,3 +27,43 @@ Downloaded from https://www.csie.ntu.edu.tw/~cjlin/libsvmtools/datasets/binary.h
 
 ## Sources / inspirations for the algorithms
 
+```bibtex
+@misc{allenzhu2016exploitingstructurestochasticgradient,
+    title={Exploiting the Structure: Stochastic Gradient Methods Using Raw Clusters}, 
+    author={Zeyuan Allen-Zhu and Yang Yuan and Karthik Sridharan},
+    year={2016},
+    eprint={1602.02151},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG},
+    url={https://arxiv.org/abs/1602.02151}, 
+}
+@misc{faghri2020studygradientvariancedeep,
+    title={A Study of Gradient Variance in Deep Learning}, 
+    author={Fartash Faghri and David Duvenaud and David J. Fleet and Jimmy Ba},
+    year={2020},
+    eprint={2007.04532},
+    archivePrefix={arXiv},
+    primaryClass={cs.LG},
+    url={https://arxiv.org/abs/2007.04532}, 
+}
+@INPROCEEDINGS{8682527,
+    author={Yuan, Kun and Ying, Bicheng and Sayed, Ali H.},
+    booktitle={ICASSP 2019 - 2019 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)}, 
+    title={COVER: A Cluster-based Variance Reduced Method for Online Learning}, 
+    year={2019},
+    volume={},
+    number={},
+    pages={3102-3106},
+    keywords={Convergence;Indexes;Steady-state;Probability distribution;Clustering algorithms;Standards;Optimization;Online leaming;Streaming data;Internal structure;Variance reduction;SGD;SAGA},
+    doi={10.1109/ICASSP.2019.8682527}
+}
+@misc{zhao2014acceleratingminibatchstochasticgradient,
+    title={Accelerating Minibatch Stochastic Gradient Descent using Stratified Sampling}, 
+    author={Peilin Zhao and Tong Zhang},
+    year={2014},
+    eprint={1405.3080},
+    archivePrefix={arXiv},
+    primaryClass={stat.ML},
+    url={https://arxiv.org/abs/1405.3080}, 
+}
+```
